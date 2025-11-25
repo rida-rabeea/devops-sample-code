@@ -1,44 +1,60 @@
 pipeline {
     agent any
 
+    environment {
+        VENV = "/opt/jenkins-venv"
+        PYTHON = "/opt/jenkins-venv/bin/python3"
+        PIP = "/opt/jenkins-venv/bin/pip"
+    }
+
     stages {
+
         stage('Build') {
             steps {
-                echo 'Creating virtual environment and installing dependencies...'
-            }
-        }
-        stage('Test') {
-            steps {
-                echo 'Running tests...'
-                sh 'python3 -m unittest discover -s .'
-            }
-        }
-        stage('Deploy') {
-            steps {
-                echo 'Deploying application...'
                 sh '''
-                mkdir -p ${WORKSPACE}/python-app-deploy
-                cp ${WORKSPACE}/app.py ${WORKSPACE}/python-app-deploy/
+                echo "Installing dependencies inside virtual environment..."
+                $PIP install -r requirements.txt
                 '''
             }
         }
+
+        stage('Test') {
+            steps {
+                sh '''
+                echo "Running tests using venv Python"
+                $PYTHON -m unittest discover -s .
+                '''
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sh '''
+                mkdir -p ${WORKSPACE}/python-app-deploy
+                cp app.py ${WORKSPACE}/python-app-deploy/
+                '''
+            }
+        }
+
         stage('Run Application') {
             steps {
-                echo 'Running application...'
                 sh '''
-                nohup python3 ${WORKSPACE}/python-app-deploy/app.py > ${WORKSPACE}/python-app-deploy/app.log 2>&1 &
+                echo "Starting Flask app using venv Python..."
+                nohup $PYTHON ${WORKSPACE}/python-app-deploy/app.py > ${WORKSPACE}/python-app-deploy/app.log 2>&1 &
                 echo $! > ${WORKSPACE}/python-app-deploy/app.pid
                 '''
             }
         }
+
         stage('Test Application') {
             steps {
-                echo 'Testing application...'
                 sh '''
-                python3 ${WORKSPACE}/test_app.py
+                echo "Testing deployed app..."
+                $PYTHON test_app.py
                 '''
             }
         }
+
     }
 
     post {
